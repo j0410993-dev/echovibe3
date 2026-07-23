@@ -1,57 +1,415 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EchoVibe | Welcome</title>
-    
-    <link rel="manifest" href="/manifest.json">
-    <meta name="theme-color" content="#a855f7">
-    <meta name="mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EchoVibe | Chat Edition</title>
+  
+  <!-- Firebase SDKs (Compat Version for Web) -->
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js"></script>
 
-    <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; }
-        body { background: #0f0f12; color: #e4e4e7; display: flex; justify-content: center; align-items: center; height: 100vh; padding: 10px; }
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+    body { background-color: #0c1317; color: #e9edef; height: 100vh; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+
+    /* AUTH SCREEN */
+    #auth-screen { background: #111b21; padding: 30px; border-radius: 12px; width: 90%; max-width: 400px; text-align: center; box-shadow: 0 4px 20px rgba(0,0,0,0.5); }
+    #auth-screen h2 { color: #a855f7; margin-bottom: 8px; font-size: 1.8rem; }
+    #auth-screen p { color: #8696a0; margin-bottom: 20px; font-size: 0.9rem; }
+    .auth-input { width: 100%; padding: 12px; margin: 8px 0; background: #2a3942; border: 1px solid #2a3942; border-radius: 8px; color: white; outline: none; font-size: 0.95rem; }
+    .file-label { display: block; text-align: left; font-size: 0.8rem; color: #8696a0; margin-top: 6px; }
+    .auth-btn { width: 100%; padding: 12px; margin-top: 12px; background: #a855f7; border: none; border-radius: 8px; color: white; font-weight: bold; font-size: 1rem; cursor: pointer; }
+    .auth-toggle { margin-top: 15px; color: #a855f7; cursor: pointer; font-size: 0.85rem; text-decoration: underline; }
+
+    /* MAIN APP DASHBOARD */
+    #main-app { display: none; width: 100vw; height: 100vh; background: #111b21; flex-direction: row; }
+    
+    /* SIDEBAR */
+    #sidebar { width: 350px; background: #111b21; border-right: 1px solid #222d34; display: flex; flex-direction: column; }
+    .sidebar-header { padding: 15px; background: #202c33; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #222d34; }
+    .sidebar-user { display: flex; align-items: center; gap: 10px; }
+    .sidebar-header h3 { color: #a855f7; font-size: 1.1rem; }
+    .logout-btn { background: transparent; border: none; color: #f87171; cursor: pointer; font-size: 0.85rem; font-weight: bold; }
+    
+    .users-list { list-style: none; overflow-y: auto; flex-grow: 1; }
+    .user-card { padding: 15px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid #222d34; cursor: pointer; transition: 0.2s; }
+    .user-card:hover { background: #202c33; }
+    .avatar { width: 42px; height: 42px; background: #a855f7; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 1.1rem; background-size: cover; background-position: center; flex-shrink: 0; }
+    .user-info { flex-grow: 1; overflow: hidden; }
+    .user-name { font-weight: 600; font-size: 0.95rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .user-email { font-size: 0.75rem; color: #8696a0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    /* CHAT PANEL */
+    #chat-panel { flex-grow: 1; display: flex; flex-direction: column; background: #0b141a; }
+    .chat-header { padding: 15px; background: #202c33; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid #222d34; }
+    .chat-body { flex-grow: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+    
+    /* MESSAGES */
+    .msg { max-width: 60%; padding: 10px 14px; border-radius: 8px; font-size: 0.9rem; line-height: 1.4; word-wrap: break-word; }
+    .msg.sent { align-self: flex-end; background: #005c4b; color: #e9edef; border-top-right-radius: 0; }
+    .msg.received { align-self: flex-start; background: #202c33; color: #e9edef; border-top-left-radius: 0; }
+    .msg .time { font-size: 0.65rem; color: #8696a0; margin-top: 4px; text-align: right; }
+
+    /* INPUT BAR */
+    .chat-footer { padding: 12px 20px; background: #202c33; display: flex; gap: 10px; align-items: center; }
+    .chat-input { flex-grow: 1; padding: 12px 16px; background: #2a3942; border: none; border-radius: 8px; color: white; outline: none; }
+    .send-btn, .mic-btn { padding: 12px 18px; background: #a855f7; border: none; border-radius: 8px; color: white; font-weight: bold; cursor: pointer; transition: 0.2s; }
+    .mic-btn { background: #2a3942; }
+
+    @media (max-width: 768px) {
+      #sidebar { width: 100%; }
+      #chat-panel { display: none; width: 100%; }
+      .show-chat #sidebar { display: none; }
+      .show-chat #chat-panel { display: flex; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- AUTHENTICATION FORM -->
+  <div id="auth-screen">
+    <h2 id="auth-title">Welcome to EchoVibe</h2>
+    <p id="auth-sub">Create your account to start chatting</p>
+    
+    <input type="text" id="username-field" class="auth-input" placeholder="Display Name / Clan Tag">
+    
+    <span class="file-label" id="avatar-label">Profile Picture (Optional):</span>
+    <input type="file" id="profile-pic-input" accept="image/*" class="auth-input">
+    
+    <input type="email" id="email-field" class="auth-input" placeholder="Email address">
+    <input type="password" id="password-field" class="auth-input" placeholder="Password">
+    
+    <button id="auth-submit-btn" class="auth-btn">Create Account</button>
+    <div id="auth-toggle-btn" class="auth-toggle">Already have an account? Log In</div>
+  </div>
+
+  <!-- WHATSAPP-STYLE DASHBOARD -->
+  <div id="main-app">
+    <!-- LEFT SIDEBAR -->
+    <div id="sidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-user">
+          <div class="avatar" id="my-avatar">?</div>
+          <h3 id="my-profile-name">EchoVibe</h3>
+        </div>
+        <button id="logout-btn" class="logout-btn">Log Out</button>
+      </div>
+      <ul class="users-list" id="users-container">
+        <!-- Registered users populate dynamically -->
+      </ul>
+    </div>
+
+    <!-- RIGHT CHAT PANEL -->
+    <div id="chat-panel">
+      <div class="chat-header">
+        <div class="avatar" id="active-avatar">?</div>
+        <div>
+          <div class="user-name" id="active-chat-name">Select a conversation</div>
+          <div class="user-email" id="active-chat-email">Tap any registered user from the sidebar to DM</div>
+        </div>
+      </div>
+
+      <div class="chat-body" id="chat-body"></div>
+
+      <div class="chat-footer">
+        <button id="mic-btn" class="mic-btn" disabled>🎙️</button>
+        <input type="text" id="message-input" class="chat-input" placeholder="Type a message..." disabled>
+        <button id="send-btn" class="send-btn" disabled>Send</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // -------------------------------------------------------------
+    // YOUR FIREBASE CONFIGURATION
+    // -------------------------------------------------------------
+    const firebaseConfig = {
+      apiKey: "AIzaSyCZwVW_FMU3o96xqUq98cmV_jl_zDUzbKs",
+      authDomain: "family-chat-2-a2b45.firebaseapp.com",
+      projectId: "family-chat-2-a2b45",
+      storageBucket: "family-chat-2-a2b45.firebasestorage.app",
+      messagingSenderId: "652417638653",
+      appId: "1:652417638653:web:569f635a44d75f855cde94"
+    };
+    
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+    const storage = firebase.storage();
+
+    // App State
+    let currentUser = null;
+    let activeChatUser = null;
+    let unsubscribeMessages = null;
+    let isLoginMode = false;
+
+    // Voice Note State
+    let mediaRecorder;
+    let audioChunks = [];
+    let isRecording = false;
+
+    // Elements
+    const authScreen = document.getElementById('auth-screen');
+    const mainApp = document.getElementById('main-app');
+    const authTitle = document.getElementById('auth-title');
+    const authSub = document.getElementById('auth-sub');
+    const usernameField = document.getElementById('username-field');
+    const avatarInput = document.getElementById('profile-pic-input');
+    const avatarLabel = document.getElementById('avatar-label');
+    const emailField = document.getElementById('email-field');
+    const passwordField = document.getElementById('password-field');
+    const authBtn = document.getElementById('auth-submit-btn');
+    const authToggle = document.getElementById('auth-toggle-btn');
+    const usersContainer = document.getElementById('users-container');
+    const chatBody = document.getElementById('chat-body');
+    const messageInput = document.getElementById('message-input');
+    const sendBtn = document.getElementById('send-btn');
+    const micBtn = document.getElementById('mic-btn');
+
+    // Toggle Auth Mode
+    authToggle.onclick = () => {
+      isLoginMode = !isLoginMode;
+      authTitle.innerText = isLoginMode ? "Welcome Back" : "Welcome to EchoVibe";
+      authSub.innerText = isLoginMode ? "Log in to your account" : "Create your account to start chatting";
+      usernameField.style.display = isLoginMode ? "none" : "block";
+      avatarInput.style.display = isLoginMode ? "none" : "block";
+      avatarLabel.style.display = isLoginMode ? "none" : "block";
+      authBtn.innerText = isLoginMode ? "Log In" : "Create Account";
+      authToggle.innerText = isLoginMode ? "Need an account? Register" : "Already have an account? Log In";
+    };
+
+    // Account Creation & Login
+    authBtn.onclick = async () => {
+      const email = emailField.value.trim();
+      const password = passwordField.value.trim();
+      const username = usernameField.value.trim();
+      const avatarFile = avatarInput.files[0];
+
+      if(!email || !password) return alert("Please enter email and password");
+
+      try {
+        if(isLoginMode) {
+          await auth.signInWithEmailAndPassword(email, password);
+        } else {
+          if(!username) return alert("Please enter a display name");
+          
+          authBtn.innerText = "Creating Account...";
+          authBtn.disabled = true;
+
+          const res = await auth.createUserWithEmailAndPassword(email, password);
+          let photoURL = "";
+
+          // Upload Avatar if selected
+          if (avatarFile) {
+            const avatarRef = storage.ref(`avatars/${res.user.uid}`);
+            await avatarRef.put(avatarFile);
+            photoURL = await avatarRef.getDownloadURL();
+          }
+
+          // Save User Data to Firestore
+          await db.collection('users').doc(res.user.uid).set({
+            uid: res.user.uid,
+            username: username,
+            email: email,
+            photoURL: photoURL,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+          });
+        }
+      } catch (err) {
+        alert(err.message);
+      } finally {
+        authBtn.innerText = isLoginMode ? "Log In" : "Create Account";
+        authBtn.disabled = false;
+      }
+    };
+
+    // Auth State Observer
+    auth.onAuthStateChanged(async (user) => {
+      if (user) {
+        currentUser = user;
+        authScreen.style.display = 'none';
+        mainApp.style.display = 'flex';
         
-        /* Shared Container Elements */
-        .card-panel {
-            width: 100%; max-width: 420px; background: #18181b; border-radius: 16px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5); border: 1px solid #27272a; overflow: hidden;
+        // Load logged in user info
+        const doc = await db.collection('users').doc(user.uid).get();
+        if (doc.exists) {
+          const userData = doc.data();
+          document.getElementById('my-profile-name').innerText = userData.username;
+          const myAvatar = document.getElementById('my-avatar');
+          if (userData.photoURL) {
+            myAvatar.style.backgroundImage = `url('${userData.photoURL}')`;
+            myAvatar.innerText = '';
+          } else {
+            myAvatar.innerText = userData.username.charAt(0).toUpperCase();
+          }
         }
 
-        /* Auth Screen Styles */
-        .auth-box { padding: 30px 24px; display: flex; flex-direction: column; gap: 20px; }
-        .auth-header { text-align: center; margin-bottom: 10px; }
-        .auth-header h2 { font-size: 1.8rem; color: #a855f7; font-weight: 800; letter-spacing: 0.5px; margin-bottom: 6px;}
-        .auth-header p { font-size: 0.85rem; color: #a1a1aa; }
-        
-        .form-group { display: flex; flex-direction: column; gap: 6px; }
-        .form-group label { font-size: 0.85rem; color: #a1a1aa; font-weight: 500; }
-        
-        input { padding: 14px; background: #0f0f12; border: 1px solid #3f3f46; border-radius: 8px; color: white; outline: none; font-size: 0.95rem; width: 100%; }
-        input:focus { border-color: #a855f7; }
-        
-        .auth-btn { background: #a855f7; color: white; border: none; padding: 14px; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 1rem; transition: background 0.2s; width: 100%; margin-top: 10px; }
-        .auth-btn:hover { background: #9333ea; }
-        
-        .auth-toggle { text-align: center; font-size: 0.85rem; color: #a1a1aa; margin-top: 5px; }
-        .auth-toggle span { color: #a855f7; cursor: pointer; font-weight: 600; text-decoration: underline; }
-        .error-lbl { color: #f43f5e; font-size: 0.85rem; text-align: center; display: none; font-weight: 500; }
+        loadAllRegisteredUsers();
+      } else {
+        authScreen.style.display = 'block';
+        mainApp.style.display = 'none';
+      }
+    });
 
-        /* Main App Interface Panel */
-        .chat-container { max-width: 500px; height: 85vh; display: none; flex-direction: column; }
-        .chat-header { background: #202024; padding: 18px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #27272a; }
-        .logo { font-weight: 800; font-size: 1.25rem; color: #a855f7; }
-        .status { font-size: 0.85rem; background: #27272a; padding: 4px 10px; border-radius: 20px; color: #a1a1aa; }
-        .status span { color: #22c55e; font-weight: bold; }
+    // Log Out
+    document.getElementById('logout-btn').onclick = () => auth.signOut();
 
-        .chat-messages { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; }
-        .msg-wrapper { display: flex; flex-direction: column; max-width: 75%; }
-        .msg-wrapper.me { align-self: flex-end; }
-        .msg-wrapper.others { align-self: flex-start; }
-        
-        .username { font-size: 0.75rem; color: #a1a1aa; margin-bottom: 4px; padding-left: 4px; }
-        .me .username { text-align: right; padding-right: 4px; }
-        .message { padding: 10px 16px; border-radius: 12px; font-size: 0.95rem; line-height: 1.4; word-break: break-word; }
-        .me .message { background: #
+    // Fetch Users for Sidebar
+    function loadAllRegisteredUsers() {
+      db.collection('users').onSnapshot(snapshot => {
+        usersContainer.innerHTML = '';
+        snapshot.forEach(doc => {
+          const u = doc.data();
+          if (u.uid !== currentUser.uid) {
+            const li = document.createElement('li');
+            li.className = 'user-card';
+            
+            const avatarHTML = u.photoURL 
+              ? `<div class="avatar" style="background-image: url('${u.photoURL}')"></div>` 
+              : `<div class="avatar">${u.username.charAt(0).toUpperCase()}</div>`;
+
+            li.innerHTML = `
+              ${avatarHTML}
+              <div class="user-info">
+                <div class="user-name">${u.username}</div>
+                <div class="user-email">${u.email}</div>
+              </div>
+            `;
+            li.onclick = () => selectUserToChat(u);
+            usersContainer.appendChild(li);
+          }
+        });
+      });
+    }
+
+    // Select User Chat
+    function selectUserToChat(targetUser) {
+      activeChatUser = targetUser;
+      document.body.classList.add('show-chat');
+      
+      document.getElementById('active-chat-name').innerText = targetUser.username;
+      document.getElementById('active-chat-email').innerText = targetUser.email;
+      
+      const activeAvatar = document.getElementById('active-avatar');
+      if (targetUser.photoURL) {
+        activeAvatar.style.backgroundImage = `url('${targetUser.photoURL}')`;
+        activeAvatar.innerText = '';
+      } else {
+        activeAvatar.style.backgroundImage = 'none';
+        activeAvatar.innerText = targetUser.username.charAt(0).toUpperCase();
+      }
+
+      messageInput.disabled = false;
+      sendBtn.disabled = false;
+      micBtn.disabled = false;
+
+      const chatRoomID = [currentUser.uid, targetUser.uid].sort().join('_');
+      
+      if (unsubscribeMessages) unsubscribeMessages();
+
+      unsubscribeMessages = db.collection('chats')
+        .doc(chatRoomID)
+        .collection('messages')
+        .orderBy('timestamp', 'asc')
+        .onSnapshot(snapshot => {
+          chatBody.innerHTML = '';
+          snapshot.forEach(doc => {
+            const data = doc.data();
+            const msgDiv = document.createElement('div');
+            const isMe = data.senderId === currentUser.uid;
+            
+            msgDiv.className = `msg ${isMe ? 'sent' : 'received'}`;
+            
+            if (data.type === 'audio') {
+              msgDiv.innerHTML = `
+                <audio controls src="${data.audioURL}" style="max-width: 200px; height: 35px;"></audio>
+                <div class="time">${data.timestamp ? new Date(data.timestamp.toDate()).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : ''}</div>
+              `;
+            } else {
+              msgDiv.innerHTML = `
+                <div>${data.text}</div>
+                <div class="time">${data.timestamp ? new Date(data.timestamp.toDate()).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : ''}</div>
+              `;
+            }
+
+            chatBody.appendChild(msgDiv);
+          });
+          chatBody.scrollTop = chatBody.scrollHeight;
+        });
+    }
+
+    // Send Text Message
+    async function sendMessage() {
+      const text = messageInput.value.trim();
+      if (!text || !activeChatUser) return;
+
+      const chatRoomID = [currentUser.uid, activeChatUser.uid].sort().join('_');
+      messageInput.value = '';
+
+      await db.collection('chats').doc(chatRoomID).collection('messages').add({
+        senderId: currentUser.uid,
+        receiverId: activeChatUser.uid,
+        text: text,
+        type: 'text',
+        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+      });
+    }
+
+    sendBtn.onclick = sendMessage;
+    messageInput.onkeypress = (e) => { if(e.key === 'Enter') sendMessage(); };
+
+    // Voice Note Recording
+    micBtn.onclick = async () => {
+      if (!isRecording) {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          mediaRecorder = new MediaRecorder(stream);
+          audioChunks = [];
+
+          mediaRecorder.ondataavailable = (e) => audioChunks.push(e.data);
+          mediaRecorder.onstop = async () => {
+            const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+            await sendVoiceNote(audioBlob);
+          };
+
+          mediaRecorder.start();
+          isRecording = true;
+          micBtn.innerText = "🛑";
+          micBtn.style.background = "#f87171";
+        } catch (err) {
+          alert("Microphone access denied or not supported.");
+        }
+      } else {
+        mediaRecorder.stop();
+        isRecording = false;
+        micBtn.innerText = "🎙️";
+        micBtn.style.background = "#2a3942";
+      }
+    };
+
+    // Upload & Send Voice Note
+    async function sendVoiceNote(blob) {
+      if (!activeChatUser) return;
+
+      const chatRoomID = [currentUser.uid, activeChatUser.uid].sort().join('_');
+      const fileName = `voice_${Date.now()}.webm`;
+      const audioRef = storage.ref(`voice_notes/${chatRoomID}/${fileName}`);
+
+      const snapshot = await audioRef.put(blob);
+      const audioURL = await snapshot.ref.getDownloadURL();
+
+      await db.collection('chats').doc(chatRoomID).collection('messages').add({
+        senderId: currentUser.uid,
+        receiverId: activeChatUser.uid,
+        audioURL: audioURL,
+        type: 'audio',
+        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+      });
+    }
+  </script>
+</body>
+    </html>
+          
