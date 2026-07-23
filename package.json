@@ -1,13 +1,22 @@
 {
-  "name": "echovibe",
+  "name": "echovibe-chat",
   "version": "1.0.0",
-  "description": "Global 15-user chat app",
-  "main": "server.js",
+  "description": "EchoVibe Real-Time Direct Messaging App with Photo Sharing & Voice Notes",
+  "main": "index.html",
   "scripts": {
-    "start": "node server.js"
+    "start": "serve -s . -l $PORT",
+    "dev": "serve -s ."
   },
+  "keywords": [
+    "echovibe",
+    "chat",
+    "firebase",
+    "realtime",
+    "messaging"
+  ],
+  "author": "Echo",
+  "license": "MIT",
   "dependencies": {
-    "express": "^4.19.2",
-    "socket.io": "^4.7.5"
+    "serve": "^14.2.1"
   }
 }
